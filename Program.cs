@@ -1,29 +1,40 @@
+using ContosoPizza;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Register the InstrumentationService
+builder.Services.AddSingleton<InstrumentationService>();
+
 // Configure OpenTelemetry
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracerProviderBuilder =>
     {
         tracerProviderBuilder
-            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("ContosoPizza"))
             .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddConsoleExporter();
+            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("ContosoPizza"))
+            .AddConsoleExporter(); // Add other exporters as needed
     })
     .WithMetrics(meterProviderBuilder =>
     {
         meterProviderBuilder
-            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("ContosoPizza"))
+            .AddMeter(InstrumentationService.MeterName)
+            .SetExemplarFilter(ExemplarFilterType.TraceBased)
+            .AddRuntimeInstrumentation()
             .AddAspNetCoreInstrumentation()
+            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("ContosoPizza"))
             .AddPrometheusExporter();
     });
 
@@ -37,12 +48,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
 
 app.MapControllers();
-
-// Map the Prometheus metrics endpoint
-app.UseOpenTelemetryPrometheusScrapingEndpoint();
+app.UseOpenTelemetryPrometheusScrapingEndpoint(); // Expose the Prometheus scraping endpoint at /metrics
 
 app.Run();
