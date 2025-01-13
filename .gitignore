@@ -6,6 +6,7 @@ obj/
 *.suo
 *.userosscache
 *.sln.docstates
+ContosoPizza.code-workspace
 
 # Rider
 .idea/
